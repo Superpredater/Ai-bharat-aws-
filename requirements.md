@@ -2,136 +2,172 @@
 
 ## Introduction
 
-The h2s-frontend is an AI-powered learning assistant frontend application designed for a hackathon project. The system provides a modern, user-friendly interface that enables users to interact with an AI learning assistant through a chat interface. The frontend integrates with an existing Node.js/Express backend that handles authentication, conversation history, and AI agent communication.
+This document specifies requirements for enhancing the H2S Learning Assistant with three major capabilities: a Student Progress Dashboard for visualizing learning metrics, an Interactive Code Editor Workspace for writing and testing code, and an AI Code Review System for analyzing student submissions. These enhancements will transform the H2S Learning Assistant from a chat-based tool into a comprehensive learning platform that tracks progress, enables hands-on coding practice, and provides intelligent feedback.
 
 ## Glossary
 
-- **Frontend_Application**: The React-based single page application that provides the user interface
-- **Backend_API**: The existing Node.js/Express server at the backend endpoints
-- **AI_Assistant**: The Python-based AI agent that processes learning queries
-- **User**: A person who registers and uses the learning assistant
-- **JWT_Token**: JSON Web Token used for authentication
-- **Chat_Interface**: The UI component where users interact with the AI assistant
-- **Conversation_History**: The stored messages between user and AI assistant
-- **Protected_Route**: A route that requires authentication to access
+- **System**: The H2S Learning Assistant application (frontend, backend, and AI service)
+- **Student**: A registered user of the H2S Learning Assistant
+- **Progress_Dashboard**: The visual interface displaying student learning metrics over time
+- **Code_Editor**: The interactive workspace where students write and execute code
+- **AI_Review_Service**: The automated code analysis component that evaluates student submissions
+- **Progress_Metric**: A measurable data point tracking student activity (questions asked, code submissions, topics covered, accuracy scores)
+- **Code_Submission**: Student-written code sent to the system for execution or review
+- **Syntax_Error**: A code error that violates language grammar rules (compilation/parsing errors)
+- **Logical_Error**: A code error where syntax is correct but behavior is incorrect (algorithm errors, edge case failures)
+- **Code_Feedback**: Detailed analysis and suggestions provided by the AI_Review_Service
+- **Demo_Mode**: System operation without requiring OpenAI API credentials
 
 ## Requirements
 
-### Requirement 1: User Registration
+### Requirement 1: Student Progress Dashboard
 
-**User Story:** As a new user, I want to register with my email and password, so that I can create an account and access the AI learning assistant.
-
-#### Acceptance Criteria
-
-1. WHEN a user provides a valid email and password, THE Frontend_Application SHALL send a POST request to /auth/register
-2. WHEN the registration is successful, THE Frontend_Application SHALL display a success message and redirect to the login page
-3. WHEN the registration fails, THE Frontend_Application SHALL display an error message with the failure reason
-4. WHEN a user provides an invalid email format, THE Frontend_Application SHALL prevent submission and display a validation error
-5. WHEN a user provides a password shorter than 6 characters, THE Frontend_Application SHALL prevent submission and display a validation error
-
-### Requirement 2: User Authentication
-
-**User Story:** As a registered user, I want to log in with my credentials, so that I can access my personalized learning assistant.
+**User Story:** As a student, I want to see my learning progress visualized over time, so that I can track my improvement and identify areas needing more practice.
 
 #### Acceptance Criteria
 
-1. WHEN a user provides valid credentials, THE Frontend_Application SHALL send a POST request to /auth/login
-2. WHEN login is successful, THE Frontend_Application SHALL store the JWT_Token in local storage
-3. WHEN login is successful, THE Frontend_Application SHALL redirect the user to the Chat_Interface
-4. WHEN login fails, THE Frontend_Application SHALL display an error message
-5. WHEN a JWT_Token exists in local storage, THE Frontend_Application SHALL automatically authenticate the user on page load
+1. WHEN a student accesses the Progress_Dashboard, THE System SHALL display line graphs showing progress trends
+2. THE Progress_Dashboard SHALL track questions asked, code submissions, topics covered, and accuracy scores as Progress_Metrics
+3. THE Progress_Dashboard SHALL provide daily, weekly, and monthly time range filters for viewing trends
+4. WHEN a student selects a time range filter, THE System SHALL update all graphs to display data for that period
+5. THE Progress_Dashboard SHALL display interactive charts that show detailed values on hover
+6. WHEN no progress data exists for a student, THE System SHALL display an empty state message encouraging the student to start learning
+7. THE System SHALL persist all Progress_Metrics to the database with timestamps
 
-### Requirement 3: Session Management
+### Requirement 2: Interactive Code Editor Workspace
 
-**User Story:** As an authenticated user, I want my session to persist across page refreshes, so that I don't have to log in repeatedly.
-
-#### Acceptance Criteria
-
-1. WHEN a user refreshes the page, THE Frontend_Application SHALL retrieve the JWT_Token from local storage
-2. WHEN a valid JWT_Token exists, THE Frontend_Application SHALL maintain the authenticated state
-3. WHEN a user logs out, THE Frontend_Application SHALL remove the JWT_Token from local storage
-4. WHEN a user logs out, THE Frontend_Application SHALL redirect to the login page
-5. WHEN an API request returns a 401 status, THE Frontend_Application SHALL clear the JWT_Token and redirect to login
-
-### Requirement 4: Protected Routes
-
-**User Story:** As a system, I want to protect authenticated routes, so that only logged-in users can access the chat interface.
+**User Story:** As a student, I want to write and test code directly in the learning platform, so that I can practice programming without switching to external tools.
 
 #### Acceptance Criteria
 
-1. WHEN an unauthenticated user attempts to access a Protected_Route, THE Frontend_Application SHALL redirect to the login page
-2. WHEN an authenticated user accesses a Protected_Route, THE Frontend_Application SHALL render the requested component
-3. WHEN a JWT_Token is present, THE Frontend_Application SHALL include it in all API request headers
-4. THE Frontend_Application SHALL verify authentication status before rendering Protected_Route components
+1. THE Code_Editor SHALL support syntax highlighting for Python, JavaScript, Java, and C++
+2. WHEN a student types code, THE Code_Editor SHALL apply language-appropriate syntax highlighting in real-time
+3. THE Code_Editor SHALL provide automatic code formatting and indentation
+4. WHEN a student clicks the run button, THE System SHALL execute the code and display output within 5 seconds
+5. WHEN code execution produces output, THE System SHALL display stdout, stderr, and return values separately
+6. WHEN code execution fails, THE System SHALL display error messages with line numbers
+7. THE System SHALL allow students to save code snippets with descriptive names
+8. WHEN a student saves a code snippet, THE System SHALL persist it to the database associated with their user account
+9. THE System SHALL allow students to load previously saved code snippets into the Code_Editor
+10. THE Code_Editor SHALL provide a clear button to reset the editor content
+11. THE System SHALL execute code in isolated environments to prevent security vulnerabilities
 
-### Requirement 5: AI Chat Interface
+### Requirement 3: AI Code Review System
 
-**User Story:** As a user, I want to send messages to the AI assistant and see responses, so that I can get help with learning topics.
-
-#### Acceptance Criteria
-
-1. WHEN a user types a message and submits it, THE Frontend_Application SHALL send a POST request to /assistant/ask with the message
-2. WHEN a message is sent, THE Frontend_Application SHALL display the user message immediately in the Chat_Interface
-3. WHEN the Backend_API responds, THE Frontend_Application SHALL display the AI response in the Chat_Interface
-4. WHEN waiting for a response, THE Frontend_Application SHALL display a loading indicator
-5. WHEN a message fails to send, THE Frontend_Application SHALL display an error message and allow retry
-
-### Requirement 6: Conversation Display
-
-**User Story:** As a user, I want to see my conversation history with the AI assistant, so that I can review previous exchanges.
+**User Story:** As a student, I want automated feedback on my code submissions, so that I can learn from my mistakes and improve my programming skills.
 
 #### Acceptance Criteria
 
-1. WHEN the Chat_Interface loads, THE Frontend_Application SHALL display all messages from the current session
-2. WHEN a new message is added, THE Frontend_Application SHALL automatically scroll to the latest message
-3. WHEN displaying messages, THE Frontend_Application SHALL visually distinguish between user messages and AI responses
-4. WHEN displaying messages, THE Frontend_Application SHALL show messages in chronological order
-5. THE Frontend_Application SHALL format AI responses with proper line breaks and readability
+1. WHEN a student submits code for review, THE AI_Review_Service SHALL analyze it for Syntax_Errors
+2. WHEN a student submits code for review, THE AI_Review_Service SHALL analyze it for Logical_Errors
+3. WHEN Syntax_Errors are detected, THE AI_Review_Service SHALL provide Code_Feedback identifying the error location and type
+4. WHEN Logical_Errors are detected, THE AI_Review_Service SHALL provide Code_Feedback explaining the algorithmic issue
+5. THE AI_Review_Service SHALL suggest specific improvements for code quality, readability, and best practices
+6. THE Code_Feedback SHALL explain what is wrong and provide guidance on how to fix it without giving complete solutions
+7. WHEN code has no errors, THE AI_Review_Service SHALL provide positive reinforcement and suggest advanced improvements
+8. THE AI_Review_Service SHALL operate in Demo_Mode without requiring OpenAI API credentials
+9. THE System SHALL display Code_Feedback in a structured format with sections for syntax, logic, and suggestions
+10. THE System SHALL persist all code reviews to the database for future reference
 
-### Requirement 7: User Experience and Visual Design
+### Requirement 4: Enhanced AI Teacher Assistant Integration
 
-**User Story:** As a user, I want a clean and intuitive interface, so that I can focus on learning without distractions.
-
-#### Acceptance Criteria
-
-1. WHEN a user first accesses the Chat_Interface, THE Frontend_Application SHALL display a welcome message
-2. WHEN the viewport size changes, THE Frontend_Application SHALL adapt the layout responsively for desktop and mobile devices
-3. WHEN displaying the chat input, THE Frontend_Application SHALL provide a text input field and a send button
-4. THE Frontend_Application SHALL use a professional color scheme and typography appropriate for a learning tool
-5. THE Frontend_Application SHALL provide clear visual feedback for interactive elements on hover and click
-
-### Requirement 8: Error Handling
-
-**User Story:** As a user, I want clear error messages when something goes wrong, so that I understand what happened and what to do next.
+**User Story:** As a student, I want the AI teacher to assist me contextually across all features, so that I receive relevant help based on my current activity.
 
 #### Acceptance Criteria
 
-1. WHEN a network request fails, THE Frontend_Application SHALL display a user-friendly error message
-2. WHEN the Backend_API is unreachable, THE Frontend_Application SHALL inform the user that the service is unavailable
-3. WHEN an API returns an error response, THE Frontend_Application SHALL display the error message from the response
-4. WHEN form validation fails, THE Frontend_Application SHALL highlight the invalid fields and show specific error messages
-5. THE Frontend_Application SHALL clear error messages when the user takes corrective action
+1. WHEN a student is using the Code_Editor, THE System SHALL provide contextual AI assistance related to the current code
+2. WHEN a student requests help, THE System SHALL offer hints without revealing complete solutions
+3. THE System SHALL integrate chat, Code_Editor, and Progress_Dashboard into a unified interface
+4. WHEN a student views their Progress_Dashboard, THE System SHALL offer AI suggestions for topics to study based on performance gaps
+5. THE System SHALL adapt teaching style based on student progress patterns (struggling vs. excelling)
+6. THE System SHALL support both technical and non-technical learning modes as per existing functionality
+7. WHEN a student asks a question while viewing code, THE System SHALL include code context in the AI query
+8. THE System SHALL maintain conversation history across all features for continuity
 
-### Requirement 9: State Management
+### Requirement 5: Code Execution Engine
 
-**User Story:** As a developer, I want centralized state management, so that the application state is predictable and maintainable.
-
-#### Acceptance Criteria
-
-1. THE Frontend_Application SHALL maintain authentication state accessible throughout the component tree
-2. THE Frontend_Application SHALL maintain chat messages state that persists during the session
-3. WHEN state changes occur, THE Frontend_Application SHALL update all dependent components reactively
-4. THE Frontend_Application SHALL separate concerns between authentication state and chat state
-5. THE Frontend_Application SHALL provide clear state update mechanisms for components
-
-### Requirement 10: API Integration
-
-**User Story:** As a developer, I want a clean API integration layer, so that backend communication is consistent and maintainable.
+**User Story:** As a student, I want to run my code safely and see results immediately, so that I can test my solutions and learn through experimentation.
 
 #### Acceptance Criteria
 
-1. THE Frontend_Application SHALL create an API client module for backend communication
-2. WHEN making authenticated requests, THE Frontend_Application SHALL automatically include the JWT_Token in the Authorization header
-3. WHEN API responses are received, THE Frontend_Application SHALL parse JSON responses consistently
-4. THE Frontend_Application SHALL handle HTTP status codes appropriately (200, 401, 400, 500)
-5. THE Frontend_Application SHALL provide a consistent error handling mechanism for all API calls
+1. THE System SHALL execute Python code using a Python interpreter
+2. THE System SHALL execute JavaScript code using a Node.js runtime
+3. THE System SHALL execute Java code using a Java compiler and JVM
+4. THE System SHALL execute C++ code using a C++ compiler
+5. WHEN code execution exceeds 10 seconds, THE System SHALL terminate the process and return a timeout error
+6. WHEN code attempts to access restricted resources, THE System SHALL block the operation and return a security error
+7. THE System SHALL limit memory usage per execution to prevent resource exhaustion
+8. THE System SHALL capture and return all console output from code execution
+9. WHEN code execution completes successfully, THE System SHALL return the exit code and execution time
+
+### Requirement 6: Progress Data Collection and Analytics
+
+**User Story:** As a student, I want my learning activities automatically tracked, so that I can see accurate progress without manual logging.
+
+#### Acceptance Criteria
+
+1. WHEN a student sends a message to the AI assistant, THE System SHALL increment the questions_asked Progress_Metric
+2. WHEN a student submits code for execution or review, THE System SHALL increment the code_submissions Progress_Metric
+3. WHEN a student receives Code_Feedback, THE System SHALL record the topic_covered based on code content analysis
+4. WHEN a student's code passes all checks, THE System SHALL record a successful submission for accuracy_score calculation
+5. THE System SHALL calculate accuracy_score as the ratio of successful submissions to total submissions
+6. THE System SHALL aggregate Progress_Metrics by day, week, and month for dashboard display
+7. THE System SHALL store raw activity events with timestamps for detailed analytics
+
+### Requirement 7: User Interface Navigation and Layout
+
+**User Story:** As a student, I want intuitive navigation between learning features, so that I can easily switch between chatting, coding, and reviewing my progress.
+
+#### Acceptance Criteria
+
+1. THE System SHALL provide a navigation menu with links to Chat, Code Editor, and Progress Dashboard
+2. WHEN a student clicks a navigation link, THE System SHALL transition to the selected feature without page reload
+3. THE System SHALL maintain user authentication state across all features
+4. THE System SHALL display the current feature prominently in the navigation menu
+5. WHEN a student is on the Code Editor page, THE System SHALL display the AI chat panel alongside the editor
+6. THE System SHALL provide responsive layouts that work on desktop and tablet devices
+7. THE System SHALL persist UI state (open panels, selected tabs) during navigation
+
+### Requirement 8: Database Schema Extensions
+
+**User Story:** As a system administrator, I want the database to store all new feature data, so that student progress and code submissions are preserved.
+
+#### Acceptance Criteria
+
+1. THE System SHALL create a progress_metrics table storing user_id, metric_type, metric_value, and timestamp
+2. THE System SHALL create a code_submissions table storing user_id, code_content, language, execution_result, and timestamp
+3. THE System SHALL create a code_reviews table storing submission_id, syntax_feedback, logic_feedback, suggestions, and timestamp
+4. THE System SHALL create a saved_snippets table storing user_id, snippet_name, code_content, language, and timestamp
+5. WHEN the System starts, THE System SHALL automatically create all required tables if they do not exist
+6. THE System SHALL establish foreign key relationships to maintain referential integrity
+7. THE System SHALL index timestamp columns for efficient time-range queries
+
+### Requirement 9: Demo Mode AI Functionality
+
+**User Story:** As a student using the system without OpenAI API access, I want intelligent code review and assistance, so that I can learn effectively in Demo_Mode.
+
+#### Acceptance Criteria
+
+1. WHEN operating in Demo_Mode, THE AI_Review_Service SHALL use rule-based analysis for Syntax_Error detection
+2. WHEN operating in Demo_Mode, THE AI_Review_Service SHALL use pattern matching for common Logical_Error detection
+3. THE System SHALL provide pre-defined Code_Feedback templates for common programming mistakes
+4. WHEN operating in Demo_Mode, THE System SHALL generate contextual hints based on code structure analysis
+5. THE System SHALL maintain a knowledge base of common programming patterns and anti-patterns
+6. WHEN OpenAI API credentials are not configured, THE System SHALL automatically operate in Demo_Mode
+7. THE System SHALL display a notice when operating in Demo_Mode indicating limited AI capabilities
+
+### Requirement 10: Code Editor Features and Usability
+
+**User Story:** As a student, I want a code editor with helpful features, so that I can write code efficiently and focus on learning.
+
+#### Acceptance Criteria
+
+1. THE Code_Editor SHALL provide line numbers for all code content
+2. THE Code_Editor SHALL support keyboard shortcuts for common operations (Ctrl+S for save, Ctrl+Enter for run)
+3. THE Code_Editor SHALL provide auto-closing brackets and quotes
+4. THE Code_Editor SHALL support undo and redo operations
+5. WHEN a student selects a programming language, THE Code_Editor SHALL update syntax highlighting immediately
+6. THE Code_Editor SHALL display a character and line count
+7. THE Code_Editor SHALL support tab indentation with configurable tab width
+8. THE Code_Editor SHALL provide a fullscreen mode for distraction-free coding
+9. WHEN code contains errors, THE Code_Editor SHALL highlight error lines based on execution feedback
