@@ -1,1100 +1,807 @@
-# Design Document: Student Learning Enhancements
+# Design Document: h2s-frontend
 
 ## Overview
 
-This design extends the H2S Learning Assistant with three integrated capabilities: a Progress Dashboard for visualizing learning metrics, an Interactive Code Editor for hands-on practice, and an AI Code Review System for intelligent feedback. The design maintains the existing three-tier architecture (React frontend, Node.js backend, Python AI service) while adding new components, API endpoints, database tables, and UI pages.
+The h2s-frontend is a React-based single page application (SPA) that provides an intuitive interface for users to interact with an AI-powered learning assistant. The application follows a modern component-based architecture with centralized state management, clean separation of concerns, and a focus on user experience.
 
-The system will track student activities automatically, store code submissions and reviews, execute code safely in isolated environments, and provide contextual AI assistance across all features. All enhancements will support demo mode operation without requiring OpenAI API credentials.
+The frontend integrates with an existing Node.js/Express backend that provides authentication services and AI assistant communication. The design emphasizes simplicity, responsiveness, and maintainability suitable for a hackathon demonstration while maintaining production-quality code structure.
 
 ## Architecture
 
-### System Architecture
-
-The enhanced system maintains the existing three-tier architecture:
+### High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     React Frontend (Vite)                    │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Progress   │  │     Code     │  │     Chat     │      │
-│  │   Dashboard  │  │    Editor    │  │  Interface   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│         │                  │                  │              │
-│         └──────────────────┴──────────────────┘              │
-│                            │                                 │
-└────────────────────────────┼─────────────────────────────────┘
-                             │ HTTP/REST
-┌────────────────────────────┼─────────────────────────────────┐
-│                  Node.js Backend (Express)                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Progress   │  │     Code     │  │  Assistant   │      │
-│  │     API      │  │  Execution   │  │     API      │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│         │                  │                  │              │
-│         │                  │                  │              │
-│    ┌────┴────────────────────────────────┐   │              │
-│    │       SQLite Database               │   │              │
-│    │  - users                            │   │              │
-│    │  - progress_metrics                 │   │              │
-│    │  - code_submissions                 │   │              │
-│    │  - code_reviews                     │   │              │
-│    │  - saved_snippets                   │   │              │
-│    └─────────────────────────────────────┘   │              │
-│                                               │              │
-└───────────────────────────────────────────────┼──────────────┘
-                                                │ HTTP
-┌───────────────────────────────────────────────┼──────────────┐
-│                Python AI Service (FastAPI)                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │     Chat     │  │     Code     │  │    Context   │      │
-│  │    Agent     │  │    Review    │  │   Analysis   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└──────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    React Application                     │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │              Routing Layer (React Router)          │ │
+│  │  - Public Routes (Login, Register)                 │ │
+│  │  - Protected Routes (Chat)                         │ │
+│  └────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │           State Management (Context API)           │ │
+│  │  - AuthContext (user, token, login, logout)        │ │
+│  │  - ChatContext (messages, sendMessage, loading)    │ │
+│  └────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │                 Component Layer                     │ │
+│  │  - Auth Components (Login, Register)               │ │
+│  │  - Chat Components (ChatInterface, MessageList)    │ │
+│  │  - Shared Components (Button, Input, ErrorMsg)     │ │
+│  └────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │              API Integration Layer                  │ │
+│  │  - API Client (axios instance with interceptors)   │ │
+│  │  - Auth Service (register, login)                  │ │
+│  │  - Assistant Service (sendMessage)                 │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          │ HTTP/REST
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│              Node.js/Express Backend API                 │
+│  - POST /auth/register                                   │
+│  - POST /auth/login                                      │
+│  - POST /assistant/ask (requires JWT)                    │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Component Interaction Flow
+### Technology Stack
 
-**Progress Dashboard Flow:**
-1. Frontend requests progress data from Node backend
-2. Backend queries SQLite for metrics within time range
-3. Backend aggregates data by day/week/month
-4. Frontend renders line graphs using charting library
+- **Framework**: React 18+ with functional components and hooks
+- **Routing**: React Router v6 for client-side routing
+- **State Management**: React Context API with useContext and useReducer
+- **HTTP Client**: Axios for API communication
+- **Styling**: CSS Modules or Tailwind CSS for component styling
+- **Build Tool**: Vite for fast development and optimized production builds
+- **Storage**: Browser localStorage for JWT token persistence
 
-**Code Execution Flow:**
-1. Student writes code in Code_Editor component
-2. Frontend sends code + language to Node backend
-3. Backend spawns isolated process for execution
-4. Backend captures output/errors with timeout
-5. Frontend displays results in output panel
+### Design Principles
 
-**Code Review Flow:**
-1. Student submits code for review
-2. Node backend stores submission in database
-3. Backend forwards code to Python AI service
-4. AI service analyzes syntax and logic
-5. AI service returns structured feedback
-6. Backend stores review in database
-7. Frontend displays feedback in sections
+1. **Component Composition**: Small, reusable components with single responsibilities
+2. **Separation of Concerns**: Clear boundaries between UI, state, and API logic
+3. **Declarative UI**: React's declarative approach for predictable rendering
+4. **Responsive Design**: Mobile-first approach with flexible layouts
+5. **Error Boundaries**: Graceful error handling at component and API levels
 
 ## Components and Interfaces
 
-### Frontend Components
+### Core Components
 
-#### ProgressDashboard Component
+#### 1. App Component
+```typescript
+// Root component that sets up routing and global providers
+interface AppProps {}
 
-**Purpose:** Display student learning metrics as interactive line graphs
+Component Structure:
+- AuthProvider wrapper
+- ChatProvider wrapper
+- Router with route definitions
+- Global error boundary
+```
 
-**Props:**
-- `userId: string` - Current authenticated user ID
+#### 2. AuthContext Provider
+```typescript
+interface AuthContextValue {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  loading: boolean;
+  error: string | null;
+}
 
-**State:**
-- `metrics: ProgressMetrics` - Loaded progress data
-- `timeRange: 'daily' | 'weekly' | 'monthly'` - Selected time filter
-- `loading: boolean` - Data loading state
-- `error: string | null` - Error message
-
-**Key Methods:**
-- `fetchProgressData(timeRange)` - Load metrics from API
-- `handleTimeRangeChange(range)` - Update time filter
-- `renderLineGraph(metricType, data)` - Render chart for metric
-
-**API Calls:**
-- `GET /api/progress?userId={id}&range={range}` - Fetch progress metrics
-
-**UI Elements:**
-- Time range selector (Daily/Weekly/Monthly buttons)
-- Four line graphs (questions, submissions, topics, accuracy)
-- Empty state message when no data exists
-- Hover tooltips showing exact values
-
-#### CodeEditor Component
-
-**Purpose:** Interactive code editor with syntax highlighting and execution
-
-**Props:**
-- `userId: string` - Current authenticated user ID
-- `initialCode: string` - Pre-loaded code content
-- `initialLanguage: string` - Pre-selected language
-
-**State:**
-- `code: string` - Current editor content
-- `language: 'python' | 'javascript' | 'java' | 'cpp'` - Selected language
-- `output: ExecutionResult | null` - Execution results
-- `executing: boolean` - Execution in progress
-- `savedSnippets: CodeSnippet[]` - User's saved code
-
-**Key Methods:**
-- `handleCodeChange(newCode)` - Update editor content
-- `handleLanguageChange(lang)` - Switch programming language
-- `executeCode()` - Send code for execution
-- `saveSnippet(name)` - Persist code to database
-- `loadSnippet(snippetId)` - Load saved code
-- `requestCodeReview()` - Submit code for AI review
-
-**API Calls:**
-- `POST /api/code/execute` - Execute code
-- `POST /api/code/review` - Request AI review
-- `POST /api/code/save` - Save code snippet
-- `GET /api/code/snippets?userId={id}` - Load saved snippets
-
-**UI Elements:**
-- Language selector dropdown
-- Code editor with syntax highlighting (using Monaco Editor or CodeMirror)
-- Run button and Save button
-- Output panel (stdout, stderr, execution time)
-- Saved snippets sidebar
-- Code review feedback panel
-
-#### CodeReviewPanel Component
-
-**Purpose:** Display structured AI feedback on code submissions
-
-**Props:**
-- `review: CodeReview` - Review data from API
-
-**State:**
-- `expandedSections: Set<string>` - Which sections are expanded
-
-**Key Methods:**
-- `toggleSection(sectionName)` - Expand/collapse section
-
-**UI Elements:**
-- Syntax errors section with line numbers
-- Logic errors section with explanations
-- Suggestions section with best practices
-- Positive feedback when code is correct
-
-#### EnhancedChatPanel Component
-
-**Purpose:** Contextual AI assistance integrated with code editor
-
-**Props:**
-- `userId: string` - Current user ID
-- `codeContext: string | null` - Current code in editor
-- `mode: 'general' | 'code-help'` - Chat mode
-
-**State:**
-- `messages: Message[]` - Chat history
-- `inputText: string` - Current input
-- `loading: boolean` - Waiting for response
-
-**Key Methods:**
-- `sendMessage(text, includeCodeContext)` - Send message to AI
-- `handleContextualHelp()` - Request help with current code
-
-**API Calls:**
-- `POST /api/assistant/ask` - Send message (existing endpoint, enhanced)
-
-### Backend API Endpoints
-
-#### Progress API
-
-**GET /api/progress**
-
-Query Parameters:
-- `userId: string` (required)
-- `range: 'daily' | 'weekly' | 'monthly'` (required)
-
-Response:
-```json
-{
-  "questionsAsked": [
-    {"date": "2024-01-15", "count": 12},
-    {"date": "2024-01-16", "count": 8}
-  ],
-  "codeSubmissions": [
-    {"date": "2024-01-15", "count": 5},
-    {"date": "2024-01-16", "count": 3}
-  ],
-  "topicsCovered": [
-    {"date": "2024-01-15", "topics": ["arrays", "loops"]},
-    {"date": "2024-01-16", "topics": ["functions"]}
-  ],
-  "accuracyScore": [
-    {"date": "2024-01-15", "score": 0.75},
-    {"date": "2024-01-16", "score": 0.80}
-  ]
+interface User {
+  id: number;
+  email: string;
 }
 ```
 
-**POST /api/progress/track**
+#### 3. ChatContext Provider
+```typescript
+interface ChatContextValue {
+  messages: Message[];
+  sendMessage: (text: string) => Promise<void>;
+  loading: boolean;
+  error: string | null;
+  clearError: () => void;
+}
 
-Request Body:
-```json
-{
-  "userId": "string",
-  "metricType": "questions_asked | code_submissions | topic_covered",
-  "metricValue": "string | number",
-  "timestamp": "ISO8601 datetime"
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'ai';
+  timestamp: Date;
 }
 ```
 
-Response:
-```json
-{
-  "success": true,
-  "metricId": "number"
+#### 4. ProtectedRoute Component
+```typescript
+interface ProtectedRouteProps {
+  children: React.ReactNode;
 }
+
+// Redirects to /login if not authenticated
+// Renders children if authenticated
 ```
 
-#### Code Execution API
+#### 5. Login Component
+```typescript
+interface LoginProps {}
 
-**POST /api/code/execute**
+State:
+- email: string
+- password: string
+- errors: { email?: string; password?: string }
 
-Request Body:
-```json
-{
-  "userId": "string",
-  "code": "string",
-  "language": "python | javascript | java | cpp"
-}
+Handlers:
+- handleSubmit: validates and calls authContext.login
+- handleInputChange: updates form state
 ```
 
-Response:
-```json
-{
-  "success": true,
-  "stdout": "string",
-  "stderr": "string",
-  "exitCode": "number",
-  "executionTime": "number (milliseconds)",
-  "submissionId": "number"
-}
+#### 6. Register Component
+```typescript
+interface RegisterProps {}
+
+State:
+- email: string
+- password: string
+- confirmPassword: string
+- errors: { email?: string; password?: string; confirmPassword?: string }
+
+Handlers:
+- handleSubmit: validates and calls authContext.register
+- handleInputChange: updates form state
 ```
 
-Error Response:
-```json
-{
-  "success": false,
-  "error": "timeout | security_violation | compilation_error",
-  "message": "string"
-}
+#### 7. ChatInterface Component
+```typescript
+interface ChatInterfaceProps {}
+
+State:
+- inputValue: string
+
+Handlers:
+- handleSendMessage: sends message via chatContext
+- handleInputChange: updates input state
+- handleKeyPress: sends on Enter key
+
+Child Components:
+- MessageList
+- ChatInput
+- LoadingIndicator
 ```
 
-#### Code Review API
-
-**POST /api/code/review**
-
-Request Body:
-```json
-{
-  "submissionId": "number",
-  "code": "string",
-  "language": "string"
+#### 8. MessageList Component
+```typescript
+interface MessageListProps {
+  messages: Message[];
 }
+
+Features:
+- Auto-scroll to bottom on new messages
+- Visual distinction between user and AI messages
+- Empty state for no messages
 ```
 
-Response:
-```json
-{
-  "reviewId": "number",
-  "syntaxErrors": [
-    {
-      "line": "number",
-      "message": "string",
-      "severity": "error | warning"
+#### 9. MessageBubble Component
+```typescript
+interface MessageBubbleProps {
+  message: Message;
+}
+
+Styling:
+- Different colors for user vs AI
+- Timestamp display
+- Proper text formatting
+```
+
+#### 10. ChatInput Component
+```typescript
+interface ChatInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSend: () => void;
+  disabled: boolean;
+}
+
+Features:
+- Text input field
+- Send button
+- Disabled state during loading
+- Enter key support
+```
+
+### API Service Layer
+
+#### API Client Configuration
+```typescript
+// axios instance with base configuration
+const apiClient = axios.create({
+  baseURL: 'http://localhost:3000',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Request interceptor to add JWT token
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor for error handling
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('token');
+      window.location.href = '/login';
     }
-  ],
-  "logicErrors": [
-    {
-      "description": "string",
-      "suggestion": "string"
-    }
-  ],
-  "suggestions": [
-    {
-      "category": "readability | performance | best_practices",
-      "message": "string"
-    }
-  ],
-  "overallFeedback": "string"
-}
+    return Promise.reject(error);
+  }
+);
 ```
 
-#### Code Snippets API
-
-**POST /api/code/save**
-
-Request Body:
-```json
-{
-  "userId": "string",
-  "snippetName": "string",
-  "code": "string",
-  "language": "string"
+#### Auth Service
+```typescript
+interface RegisterRequest {
+  email: string;
+  password: string;
 }
+
+interface RegisterResponse {
+  message: string;
+}
+
+interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+interface LoginResponse {
+  token: string;
+}
+
+const authService = {
+  register: (data: RegisterRequest): Promise<RegisterResponse> => 
+    apiClient.post('/auth/register', data),
+  
+  login: (data: LoginRequest): Promise<LoginResponse> => 
+    apiClient.post('/auth/login', data)
+};
 ```
 
-Response:
-```json
-{
-  "success": true,
-  "snippetId": "number"
+#### Assistant Service
+```typescript
+interface AskRequest {
+  message: string;
 }
-```
 
-**GET /api/code/snippets**
-
-Query Parameters:
-- `userId: string` (required)
-
-Response:
-```json
-{
-  "snippets": [
-    {
-      "id": "number",
-      "name": "string",
-      "language": "string",
-      "code": "string",
-      "createdAt": "ISO8601 datetime"
-    }
-  ]
+interface AskResponse {
+  response: string;
 }
-```
 
-**DELETE /api/code/snippets/:id**
-
-Response:
-```json
-{
-  "success": true
-}
-```
-
-### Python AI Service Endpoints
-
-#### Code Review Endpoint
-
-**POST /ai/review**
-
-Request Body:
-```json
-{
-  "code": "string",
-  "language": "string",
-  "demoMode": "boolean"
-}
-```
-
-Response:
-```json
-{
-  "syntaxErrors": [...],
-  "logicErrors": [...],
-  "suggestions": [...],
-  "overallFeedback": "string"
-}
-```
-
-**Implementation Strategy:**
-- In demo mode: Use AST parsing and pattern matching
-- With OpenAI: Use LLM for deeper analysis
-- Maintain rule-based fallbacks for common errors
-
-#### Enhanced Chat Endpoint
-
-**POST /ai/ask** (Enhanced existing endpoint)
-
-Request Body:
-```json
-{
-  "message": "string",
-  "history": [...],
-  "codeContext": "string | null",
-  "mode": "general | code-help"
-}
-```
-
-Response:
-```json
-{
-  "response": "string"
-}
+const assistantService = {
+  sendMessage: (data: AskRequest): Promise<AskResponse> => 
+    apiClient.post('/assistant/ask', data)
+};
 ```
 
 ## Data Models
 
-### Database Schema
+### Frontend Data Models
 
-#### progress_metrics Table
-
-```sql
-CREATE TABLE progress_metrics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    metric_type TEXT NOT NULL,  -- 'questions_asked', 'code_submissions', 'topic_covered', 'accuracy_score'
-    metric_value TEXT NOT NULL,  -- JSON string for complex values
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_progress_user_time ON progress_metrics(user_id, timestamp);
-CREATE INDEX idx_progress_type ON progress_metrics(metric_type);
-```
-
-#### code_submissions Table
-
-```sql
-CREATE TABLE code_submissions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    code_content TEXT NOT NULL,
-    language TEXT NOT NULL,
-    execution_result TEXT,  -- JSON string with stdout, stderr, exitCode
-    success BOOLEAN DEFAULT 0,
-    execution_time INTEGER,  -- milliseconds
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_submissions_user_time ON code_submissions(user_id, timestamp);
-```
-
-#### code_reviews Table
-
-```sql
-CREATE TABLE code_reviews (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    submission_id INTEGER NOT NULL,
-    syntax_feedback TEXT,  -- JSON array of syntax errors
-    logic_feedback TEXT,   -- JSON array of logic errors
-    suggestions TEXT,      -- JSON array of suggestions
-    overall_feedback TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (submission_id) REFERENCES code_submissions(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_reviews_submission ON code_reviews(submission_id);
-```
-
-#### saved_snippets Table
-
-```sql
-CREATE TABLE saved_snippets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    snippet_name TEXT NOT NULL,
-    code_content TEXT NOT NULL,
-    language TEXT NOT NULL,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_snippets_user ON saved_snippets(user_id);
-```
-
-### TypeScript Interfaces (Frontend)
-
+#### User Model
 ```typescript
-interface ProgressMetrics {
-  questionsAsked: DataPoint[];
-  codeSubmissions: DataPoint[];
-  topicsCovered: TopicDataPoint[];
-  accuracyScore: DataPoint[];
-}
-
-interface DataPoint {
-  date: string;
-  count: number;
-}
-
-interface TopicDataPoint {
-  date: string;
-  topics: string[];
-}
-
-interface ExecutionResult {
-  success: boolean;
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-  executionTime: number;
-  submissionId: number;
-}
-
-interface CodeReview {
-  reviewId: number;
-  syntaxErrors: SyntaxError[];
-  logicErrors: LogicError[];
-  suggestions: Suggestion[];
-  overallFeedback: string;
-}
-
-interface SyntaxError {
-  line: number;
-  message: string;
-  severity: 'error' | 'warning';
-}
-
-interface LogicError {
-  description: string;
-  suggestion: string;
-}
-
-interface Suggestion {
-  category: 'readability' | 'performance' | 'best_practices';
-  message: string;
-}
-
-interface CodeSnippet {
+interface User {
   id: number;
-  name: string;
-  language: string;
-  code: string;
-  createdAt: string;
+  email: string;
 }
 ```
 
-## Code Execution Security
-
-### Isolation Strategy
-
-Code execution must be isolated to prevent security vulnerabilities:
-
-1. **Process Isolation:** Each execution runs in a separate child process
-2. **Timeout Enforcement:** 10-second maximum execution time
-3. **Resource Limits:** Memory and CPU limits per process
-4. **Filesystem Restrictions:** No file system access except temp directories
-5. **Network Restrictions:** No network access during execution
-
-### Implementation Approach
-
-**Node.js Backend:**
-```javascript
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs').promises;
-const crypto = require('crypto');
-
-async function executeCode(code, language) {
-  const executionId = crypto.randomBytes(16).toString('hex');
-  const tempDir = path.join(__dirname, 'temp', executionId);
-  
-  await fs.mkdir(tempDir, { recursive: true });
-  
-  const config = getLanguageConfig(language);
-  const filePath = path.join(tempDir, config.filename);
-  
-  await fs.writeFile(filePath, code);
-  
-  return new Promise((resolve, reject) => {
-    const process = spawn(config.command, config.args(filePath), {
-      timeout: 10000,
-      cwd: tempDir,
-      env: { ...process.env, NO_NETWORK: '1' }
-    });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    process.stdout.on('data', (data) => { stdout += data; });
-    process.stderr.on('data', (data) => { stderr += data; });
-    
-    process.on('close', async (code) => {
-      await fs.rm(tempDir, { recursive: true, force: true });
-      resolve({ stdout, stderr, exitCode: code });
-    });
-    
-    process.on('error', async (err) => {
-      await fs.rm(tempDir, { recursive: true, force: true });
-      reject(err);
-    });
-  });
-}
-
-function getLanguageConfig(language) {
-  const configs = {
-    python: {
-      filename: 'code.py',
-      command: 'python3',
-      args: (file) => [file]
-    },
-    javascript: {
-      filename: 'code.js',
-      command: 'node',
-      args: (file) => [file]
-    },
-    java: {
-      filename: 'Main.java',
-      command: 'java',
-      args: (file) => [file]
-    },
-    cpp: {
-      filename: 'code.cpp',
-      command: 'g++',
-      args: (file) => [file, '-o', 'code.out', '&&', './code.out']
-    }
-  };
-  return configs[language];
+#### Message Model
+```typescript
+interface Message {
+  id: string;           // UUID generated on frontend
+  text: string;         // Message content
+  sender: 'user' | 'ai'; // Message sender type
+  timestamp: Date;      // When message was created
 }
 ```
 
-## Demo Mode AI Implementation
-
-### Code Review in Demo Mode
-
-The AI service will use rule-based analysis when OpenAI is unavailable:
-
-**Syntax Error Detection:**
-- Python: Use `ast.parse()` to detect syntax errors
-- JavaScript: Use `esprima` or similar parser
-- Java: Attempt compilation and capture errors
-- C++: Attempt compilation and capture errors
-
-**Logic Error Detection (Pattern Matching):**
-- Infinite loops (while True without break)
-- Uninitialized variables
-- Array index out of bounds patterns
-- Null/undefined access patterns
-- Common algorithm mistakes (off-by-one errors)
-
-**Suggestion Generation:**
-- Check for naming conventions
-- Detect missing error handling
-- Identify code duplication
-- Flag magic numbers
-- Suggest const/final for unchanging values
-
-**Python Implementation:**
-```python
-import ast
-import re
-
-def analyze_code_demo(code, language):
-    if language == 'python':
-        return analyze_python_demo(code)
-    # Similar for other languages
-    
-def analyze_python_demo(code):
-    syntax_errors = []
-    logic_errors = []
-    suggestions = []
-    
-    # Syntax check
-    try:
-        tree = ast.parse(code)
-    except SyntaxError as e:
-        syntax_errors.append({
-            'line': e.lineno,
-            'message': e.msg,
-            'severity': 'error'
-        })
-        return {
-            'syntaxErrors': syntax_errors,
-            'logicErrors': [],
-            'suggestions': [],
-            'overallFeedback': 'Fix syntax errors before proceeding.'
-        }
-    
-    # Logic checks
-    for node in ast.walk(tree):
-        # Check for infinite loops
-        if isinstance(node, ast.While):
-            if isinstance(node.test, ast.Constant) and node.test.value == True:
-                has_break = any(isinstance(n, ast.Break) for n in ast.walk(node))
-                if not has_break:
-                    logic_errors.append({
-                        'description': 'Potential infinite loop detected',
-                        'suggestion': 'Add a break condition or change loop condition'
-                    })
-        
-        # Check for bare except
-        if isinstance(node, ast.ExceptHandler) and node.type is None:
-            suggestions.append({
-                'category': 'best_practices',
-                'message': 'Avoid bare except clauses. Catch specific exceptions.'
-            })
-    
-    # Naming conventions
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            if not re.match(r'^[a-z_][a-z0-9_]*$', node.name):
-                suggestions.append({
-                    'category': 'readability',
-                    'message': f'Function "{node.name}" should use snake_case naming'
-                })
-    
-    overall = generate_overall_feedback(syntax_errors, logic_errors, suggestions)
-    
-    return {
-        'syntaxErrors': syntax_errors,
-        'logicErrors': logic_errors,
-        'suggestions': suggestions,
-        'overallFeedback': overall
-    }
-
-def generate_overall_feedback(syntax_errors, logic_errors, suggestions):
-    if syntax_errors:
-        return "Your code has syntax errors. Fix these first before running."
-    elif logic_errors:
-        return "Your code is syntactically correct but may have logic issues. Review the feedback carefully."
-    elif suggestions:
-        return "Great job! Your code works, but here are some suggestions to improve it."
-    else:
-        return "Excellent work! Your code looks good. Keep practicing!"
+#### Auth State Model
+```typescript
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
+}
 ```
 
+#### Chat State Model
+```typescript
+interface ChatState {
+  messages: Message[];
+  loading: boolean;
+  error: string | null;
+}
+```
 
+### API Request/Response Models
+
+#### Registration
+```typescript
+// Request
+POST /auth/register
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+
+// Success Response (200)
+{
+  "message": "User registered successfully"
+}
+
+// Error Response (400/500)
+{
+  "error": "Missing fields" | "DB Error" | "Server error"
+}
+```
+
+#### Login
+```typescript
+// Request
+POST /auth/login
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+
+// Success Response (200)
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+// Error Response (401/500)
+{
+  "error": "Invalid credentials" | "DB Error"
+}
+```
+
+#### Send Message
+```typescript
+// Request
+POST /assistant/ask
+Headers: { "Authorization": "Bearer <token>" }
+{
+  "message": "How do I learn React?"
+}
+
+// Success Response (200)
+{
+  "response": "React is a JavaScript library for building user interfaces..."
+}
+
+// Error Response (500)
+{
+  "error": "AI dynamic handling failed"
+}
+```
 
 ## Correctness Properties
 
-A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.
+*A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-### Property 1: Progress data filtering
 
-*For any* time range selection (daily, weekly, monthly) and any set of progress metrics with timestamps, all displayed data points should fall within the selected time range boundaries.
+### Property 1: Valid registration triggers API call
+*For any* valid email and password combination, submitting the registration form should send a POST request to /auth/register with the provided credentials.
+**Validates: Requirements 1.1**
 
+### Property 2: Successful registration shows success and redirects
+*For any* successful registration API response, the application should display a success message and navigate to the login page.
+**Validates: Requirements 1.2**
+
+### Property 3: Email validation rejects invalid formats
+*For any* string that does not match valid email format (missing @, invalid domain, etc.), the registration form should prevent submission and display a validation error.
 **Validates: Requirements 1.4**
 
-### Property 2: Metric persistence round-trip
+### Property 4: Password validation enforces minimum length
+*For any* password string with fewer than 6 characters, the registration form should prevent submission and display a validation error.
+**Validates: Requirements 1.5**
 
-*For any* progress metric (questions_asked, code_submissions, topic_covered, accuracy_score), after recording it to the database, querying for that user's metrics should return the recorded metric with a timestamp.
+### Property 5: Valid login triggers API call
+*For any* valid email and password combination, submitting the login form should send a POST request to /auth/login with the provided credentials.
+**Validates: Requirements 2.1**
 
-**Validates: Requirements 1.7, 6.7**
+### Property 6: Successful login stores token
+*For any* successful login response containing a JWT token, the application should store that token in localStorage under the key 'token'.
+**Validates: Requirements 2.2**
 
-### Property 3: Code execution timeout enforcement
+### Property 7: Successful login redirects to chat
+*For any* successful login, the application should navigate the user to the chat interface route.
+**Validates: Requirements 2.3**
 
-*For any* code that runs longer than 10 seconds, the execution engine should terminate the process and return a timeout error before 11 seconds elapse.
+### Property 8: API errors display error messages
+*For any* API error response (registration failure, login failure, message send failure, network error), the application should extract and display an appropriate error message to the user.
+**Validates: Requirements 1.3, 2.4, 8.1, 8.3**
 
+### Property 9: Token persistence enables auto-authentication
+*For any* valid JWT token stored in localStorage, when the application loads, it should automatically set the authenticated state to true and populate the user context.
+**Validates: Requirements 2.5, 3.1, 3.2**
+
+### Property 10: Logout clears token and redirects
+*For any* authenticated session, when the user logs out, the application should remove the JWT token from localStorage and navigate to the login page.
+**Validates: Requirements 3.3, 3.4**
+
+### Property 11: 401 responses trigger re-authentication
+*For any* API request that returns a 401 Unauthorized status, the application should clear the stored JWT token and redirect to the login page.
+**Validates: Requirements 3.5**
+
+### Property 12: Unauthenticated users cannot access protected routes
+*For any* protected route, when an unauthenticated user (no valid token) attempts to access it, the application should redirect to the login page instead of rendering the protected component.
+**Validates: Requirements 4.1, 4.4**
+
+### Property 13: Authenticated users can access protected routes
+*For any* protected route, when an authenticated user (valid token exists) attempts to access it, the application should render the requested component.
+**Validates: Requirements 4.2**
+
+### Property 14: Authenticated requests include token header
+*For any* API request made while a JWT token exists in localStorage, the request should include an Authorization header with the format "Bearer <token>".
+**Validates: Requirements 4.3**
+
+### Property 15: Message submission triggers API call
+*For any* non-empty message text, when the user submits it, the application should send a POST request to /assistant/ask with the message in the request body.
+**Validates: Requirements 5.1**
+
+### Property 16: User messages display immediately (optimistic update)
+*For any* message submitted by the user, the message should appear in the chat interface immediately, before the AI response is received.
+**Validates: Requirements 5.2**
+
+### Property 17: AI responses display when received
+*For any* successful response from the /assistant/ask endpoint, the AI's response text should be displayed as a new message in the chat interface.
+**Validates: Requirements 5.3**
+
+### Property 18: Loading indicator shows during message processing
+*For any* message submission, while waiting for the API response, the application should display a loading indicator.
+**Validates: Requirements 5.4**
+
+### Property 19: Failed messages show error and allow retry
+*For any* message that fails to send (network error or API error), the application should display an error message and keep the input field populated to allow the user to retry.
 **Validates: Requirements 5.5**
 
-### Property 4: Execution result structure completeness
-
-*For any* code execution (successful or failed), the response should contain stdout, stderr, exitCode, and executionTime fields.
-
-**Validates: Requirements 2.5, 5.9**
-
-### Property 5: Code snippet round-trip preservation
-
-*For any* valid code snippet with a name and language, saving it then loading it back should return code content identical to the original.
-
-**Validates: Requirements 2.7, 2.8, 2.9**
-
-### Property 6: Security isolation enforcement
-
-*For any* code that attempts to access restricted resources (file system outside temp directory, network, system calls), the execution engine should block the operation and return a security error.
-
-**Validates: Requirements 2.11, 5.6**
-
-### Property 7: Code review response structure
-
-*For any* code submission sent for review, the response should contain syntaxErrors, logicErrors, suggestions, and overallFeedback sections (arrays may be empty but fields must exist).
-
-**Validates: Requirements 3.1, 3.2, 3.9**
-
-### Property 8: Syntax error location reporting
-
-*For any* code with known syntax errors, the review feedback should include line numbers indicating where each error occurs.
-
-**Validates: Requirements 3.3**
-
-### Property 9: Review persistence
-
-*For any* code review generated by the AI service, querying the database with the submission ID should return the complete review data including all feedback sections.
-
-**Validates: Requirements 3.10**
-
-### Property 10: Code context inclusion
-
-*For any* AI assistance request made while code is present in the editor, the API request to the AI service should include the current code content as context.
-
-**Validates: Requirements 4.1, 4.7**
-
-### Property 11: Conversation history continuity
-
-*For any* authenticated user session, navigating between features (chat, code editor, dashboard) should preserve the conversation history without loss of messages.
-
-**Validates: Requirements 4.8**
-
-### Property 12: Memory limit enforcement
-
-*For any* code execution, the process memory usage should not exceed the configured limit, and attempts to allocate beyond the limit should result in termination.
-
-**Validates: Requirements 5.7**
-
-### Property 13: Output capture completeness
-
-*For any* code that writes to stdout or stderr, all output should be captured and returned in the execution result without truncation (up to reasonable size limits).
-
-**Validates: Requirements 5.8**
-
-### Property 14: Automatic metric incrementation
-
-*For any* student activity (sending message, submitting code), the corresponding progress metric counter should increase by exactly 1.
-
-**Validates: Requirements 6.1, 6.2**
-
-### Property 15: Accuracy score calculation correctness
-
-*For any* set of code submissions for a user, the calculated accuracy_score should equal the number of successful submissions divided by the total number of submissions.
-
-**Validates: Requirements 6.5**
-
-### Property 16: Metric aggregation correctness
-
-*For any* set of progress metrics with timestamps, aggregating by day/week/month should group all metrics with timestamps in the same period together with no omissions or duplicates.
-
-**Validates: Requirements 6.6**
-
-### Property 17: SPA navigation without reload
-
-*For any* navigation link click within the application, the browser should not perform a full page reload (no HTTP GET request for HTML).
-
-**Validates: Requirements 7.2**
-
-### Property 18: Authentication state persistence
-
-*For any* authenticated user, navigating between any features should maintain the authentication token and user identity without requiring re-login.
-
-**Validates: Requirements 7.3**
-
-### Property 19: Active feature highlighting
-
-*For any* currently displayed feature page, the navigation menu should visually indicate that feature as active.
-
-**Validates: Requirements 7.4**
-
-### Property 20: UI state persistence across navigation
-
-*For any* UI state (open panels, selected tabs, editor content), navigating away from a feature and returning should restore the previous state.
-
-**Validates: Requirements 7.7**
-
-### Property 21: Foreign key referential integrity
-
-*For any* attempt to insert a record with a foreign key reference to a non-existent parent record, the database should reject the operation with a constraint violation error.
-
-**Validates: Requirements 8.6**
-
-### Property 22: Demo mode contextual hints
-
-*For any* code structure analyzed in demo mode, generated hints should reference elements actually present in the code (variable names, function names, control structures).
-
-**Validates: Requirements 9.4**
-
-### Property 23: Language-specific syntax highlighting
-
-*For any* programming language selection, the editor should apply syntax highlighting rules appropriate to that language (keywords, strings, comments colored correctly).
-
-**Validates: Requirements 10.5**
-
-### Property 24: Character and line count accuracy
-
-*For any* code content in the editor, the displayed character count should equal the actual string length, and the line count should equal the number of newline characters plus one.
-
-**Validates: Requirements 10.6**
-
-### Property 25: Error line highlighting accuracy
-
-*For any* execution result containing error line numbers, the editor should highlight exactly those line numbers and no others.
-
-**Validates: Requirements 10.9**
+### Property 20: All session messages are displayed
+*For any* set of messages in the chat state, all messages should be rendered in the message list component.
+**Validates: Requirements 6.1**
+
+### Property 21: New messages trigger auto-scroll
+*For any* new message added to the chat, the message list should automatically scroll to show the latest message at the bottom.
+**Validates: Requirements 6.2**
+
+### Property 22: User and AI messages are visually distinct
+*For any* message in the chat interface, user messages and AI messages should have different visual styling (colors, alignment, or other visual indicators).
+**Validates: Requirements 6.3**
+
+### Property 23: Messages display in chronological order
+*For any* set of messages with timestamps, the messages should be displayed sorted by timestamp in ascending order (oldest first).
+**Validates: Requirements 6.4**
+
+### Property 24: Session state persists until page refresh
+*For any* messages added to the chat state during a session, those messages should remain in state and be displayed until the page is refreshed or the user logs out.
+**Validates: Requirements 9.2**
+
+### Property 25: Form validation highlights invalid fields
+*For any* form with validation errors, the invalid fields should be visually highlighted and display specific error messages indicating what needs to be corrected.
+**Validates: Requirements 8.4**
+
+### Property 26: Error messages clear on corrective action
+*For any* displayed error message, when the user takes action to correct the error (e.g., typing in a field, resubmitting), the error message should be cleared.
+**Validates: Requirements 8.5**
+
+### Property 27: JSON responses parse correctly
+*For any* API response with Content-Type application/json, the response body should be parsed as JSON and made available to the application.
+**Validates: Requirements 10.3**
+
+### Property 28: HTTP status codes trigger appropriate handling
+*For any* API response, the application should handle different HTTP status codes appropriately: 200 (success), 401 (unauthorized - clear token and redirect), 400 (client error - show error), 500 (server error - show error).
+**Validates: Requirements 10.4**
 
 ## Error Handling
 
-### Frontend Error Handling
+### Error Categories and Handling Strategies
 
-**Network Errors:**
-- Display user-friendly messages when API calls fail
-- Provide retry mechanisms for transient failures
-- Show offline indicators when backend is unreachable
+#### 1. Network Errors
+**Scenario**: Backend API is unreachable, network connection lost, timeout
 
-**Validation Errors:**
-- Validate code snippet names before saving (non-empty, reasonable length)
-- Validate language selection before execution
-- Prevent submission of empty code for review
+**Handling**:
+- Catch network errors in API client interceptor
+- Display user-friendly message: "Unable to connect to the server. Please check your internet connection."
+- Provide retry mechanism for failed requests
+- Maintain application state (don't lose user input)
 
-**State Errors:**
-- Handle missing authentication gracefully (redirect to login)
-- Handle corrupted local storage data (clear and reset)
-- Handle race conditions in concurrent API calls
+#### 2. Authentication Errors (401)
+**Scenario**: Invalid or expired JWT token, unauthorized access
 
-### Backend Error Handling
+**Handling**:
+- Intercept 401 responses globally in axios interceptor
+- Clear stored JWT token from localStorage
+- Reset authentication state to unauthenticated
+- Redirect user to login page
+- Display message: "Your session has expired. Please log in again."
 
-**Database Errors:**
-- Catch and log all database operation failures
-- Return appropriate HTTP status codes (500 for server errors)
-- Implement transaction rollback for multi-step operations
+#### 3. Validation Errors (400)
+**Scenario**: Invalid input data, missing required fields
 
-**Execution Errors:**
-- Catch process spawn failures (missing interpreters/compilers)
-- Handle timeout errors gracefully
-- Clean up temporary files even on error
-- Prevent resource leaks from failed executions
+**Handling**:
+- Display specific validation errors next to relevant form fields
+- Prevent form submission until validation passes
+- Client-side validation before API calls (email format, password length)
+- Server-side validation errors displayed from API response
 
-**AI Service Errors:**
-- Implement fallback to demo mode if AI service is down
-- Retry failed AI requests with exponential backoff
-- Cache recent AI responses to reduce load
+#### 4. Server Errors (500)
+**Scenario**: Backend crashes, database errors, AI service unavailable
 
-### Python AI Service Error Handling
+**Handling**:
+- Display generic error message: "Something went wrong. Please try again later."
+- Log error details to console for debugging
+- Provide retry option for user
+- Don't expose internal error details to user
 
-**Parsing Errors:**
-- Catch syntax errors during AST parsing
-- Return structured error information
-- Provide helpful error messages for unsupported languages
+#### 5. Component Errors
+**Scenario**: React component rendering errors, unexpected state
 
-**Analysis Errors:**
-- Handle edge cases in pattern matching
-- Gracefully degrade when analysis fails
-- Always return valid response structure even on partial failure
+**Handling**:
+- Implement Error Boundary component at app root
+- Catch and log component errors
+- Display fallback UI: "Something went wrong. Please refresh the page."
+- Prevent entire app crash from single component failure
+
+### Error State Management
+
+```typescript
+interface ErrorState {
+  message: string;
+  type: 'network' | 'auth' | 'validation' | 'server' | 'component';
+  field?: string; // For validation errors
+  retryable: boolean;
+}
+
+// Error handling in contexts
+const handleError = (error: AxiosError): ErrorState => {
+  if (!error.response) {
+    return {
+      message: 'Unable to connect to the server',
+      type: 'network',
+      retryable: true
+    };
+  }
+  
+  switch (error.response.status) {
+    case 401:
+      return {
+        message: 'Session expired. Please log in again.',
+        type: 'auth',
+        retryable: false
+      };
+    case 400:
+      return {
+        message: error.response.data.error || 'Invalid input',
+        type: 'validation',
+        retryable: false
+      };
+    case 500:
+      return {
+        message: 'Server error. Please try again later.',
+        type: 'server',
+        retryable: true
+      };
+    default:
+      return {
+        message: 'An unexpected error occurred',
+        type: 'server',
+        retryable: true
+      };
+  }
+};
+```
 
 ## Testing Strategy
 
-### Dual Testing Approach
+### Overview
 
-This feature requires both unit testing and property-based testing for comprehensive coverage:
+The testing strategy employs a dual approach combining unit tests for specific scenarios and property-based tests for universal correctness properties. This ensures both concrete bug detection and comprehensive coverage of input spaces.
 
-**Unit Tests:** Verify specific examples, edge cases, and error conditions
-- Test empty progress data display (edge case from 1.6)
-- Test each supported language execution (examples from 5.1-5.4)
-- Test database table creation (examples from 8.1-8.5)
-- Test demo mode activation (examples from 9.1-9.7)
-- Test keyboard shortcuts (example from 10.2)
-- Test navigation menu structure (example from 7.1)
-- Test code review with no errors (example from 3.7)
+### Unit Testing
 
-**Property Tests:** Verify universal properties across all inputs
-- All 25 correctness properties listed above
-- Each property test should run minimum 100 iterations
-- Use property-based testing library (fast-check for JavaScript/TypeScript, Hypothesis for Python)
+Unit tests focus on:
+- **Specific examples**: Concrete test cases that demonstrate correct behavior
+- **Edge cases**: Boundary conditions like empty inputs, maximum lengths, special characters
+- **Integration points**: Component interactions, context providers, API service integration
+- **Error conditions**: Specific error scenarios and recovery paths
 
-### Property-Based Testing Configuration
+**Testing Library**: React Testing Library + Jest
+- Component rendering and user interactions
+- Mock API calls with MSW (Mock Service Worker)
+- Test user flows (registration, login, sending messages)
 
-**JavaScript/TypeScript (Frontend & Backend):**
-- Library: fast-check
-- Configuration: 100 iterations minimum per test
-- Tag format: `// Feature: student-learning-enhancements, Property N: [property text]`
+**Example Unit Tests**:
+```typescript
+// Login component
+- Should render email and password fields
+- Should show validation error for invalid email
+- Should call login API with correct credentials
+- Should redirect to chat on successful login
+- Should display error message on login failure
 
-**Python (AI Service):**
-- Library: Hypothesis
-- Configuration: 100 examples minimum per test
-- Tag format: `# Feature: student-learning-enhancements, Property N: [property text]`
+// ChatInterface component
+- Should display welcome message when no messages exist
+- Should render all messages from state
+- Should disable input during message sending
+- Should show loading indicator while waiting for response
+- Should handle empty message submission
+
+// ProtectedRoute component
+- Should redirect to login when not authenticated
+- Should render children when authenticated
+- Should check authentication before rendering
+```
+
+### Property-Based Testing
+
+Property tests verify universal properties across randomized inputs to catch edge cases that unit tests might miss.
+
+**Testing Library**: fast-check (JavaScript property-based testing library)
+
+**Configuration**:
+- Minimum 100 iterations per property test
+- Each test tagged with feature name and property number
+- Tag format: `// Feature: h2s-frontend, Property N: <property description>`
+
+**Property Test Implementation**:
+
+Each correctness property from the design document should be implemented as a property-based test. The tests should:
+1. Generate random valid inputs using fast-check arbitraries
+2. Execute the system behavior
+3. Assert the property holds for all generated inputs
+
+**Example Property Tests**:
+
+```typescript
+// Property 3: Email validation rejects invalid formats
+// Feature: h2s-frontend, Property 3: Email validation rejects invalid formats
+test('email validation rejects all invalid formats', () => {
+  fc.assert(
+    fc.property(
+      fc.string().filter(s => !isValidEmail(s)), // Generate invalid emails
+      (invalidEmail) => {
+        const result = validateEmail(invalidEmail);
+        expect(result.isValid).toBe(false);
+        expect(result.error).toBeDefined();
+      }
+    ),
+    { numRuns: 100 }
+  );
+});
+
+// Property 6: Successful login stores token
+// Feature: h2s-frontend, Property 6: Successful login stores token
+test('any successful login response stores token in localStorage', () => {
+  fc.assert(
+    fc.property(
+      fc.string({ minLength: 20 }), // Generate random JWT-like tokens
+      fc.emailAddress(),
+      (token, email) => {
+        // Mock successful login response
+        const response = { token };
+        handleLoginSuccess(response, email);
+        
+        expect(localStorage.getItem('token')).toBe(token);
+      }
+    ),
+    { numRuns: 100 }
+  );
+});
+
+// Property 14: Authenticated requests include token header
+// Feature: h2s-frontend, Property 14: Authenticated requests include token header
+test('all API requests include token when authenticated', () => {
+  fc.assert(
+    fc.property(
+      fc.string({ minLength: 20 }), // Random token
+      fc.constantFrom('/assistant/ask', '/auth/login', '/auth/register'), // Random endpoint
+      (token, endpoint) => {
+        localStorage.setItem('token', token);
+        const config = apiClient.interceptors.request.handlers[0](
+          { url: endpoint, headers: {} }
+        );
+        
+        expect(config.headers.Authorization).toBe(`Bearer ${token}`);
+      }
+    ),
+    { numRuns: 100 }
+  );
+});
+
+// Property 23: Messages display in chronological order
+// Feature: h2s-frontend, Property 23: Messages display in chronological order
+test('messages are always sorted by timestamp', () => {
+  fc.assert(
+    fc.property(
+      fc.array(fc.record({
+        id: fc.uuid(),
+        text: fc.string(),
+        sender: fc.constantFrom('user', 'ai'),
+        timestamp: fc.date()
+      }), { minLength: 2, maxLength: 20 }),
+      (messages) => {
+        const sorted = sortMessagesByTimestamp(messages);
+        
+        for (let i = 1; i < sorted.length; i++) {
+          expect(sorted[i].timestamp.getTime())
+            .toBeGreaterThanOrEqual(sorted[i-1].timestamp.getTime());
+        }
+      }
+    ),
+    { numRuns: 100 }
+  );
+});
+```
+
+### Testing Coverage Goals
+
+- **Unit Test Coverage**: Minimum 80% code coverage
+- **Property Test Coverage**: All 28 correctness properties implemented
+- **Integration Tests**: Key user flows (registration → login → chat)
+- **E2E Tests**: Optional for hackathon, recommended for production
 
 ### Test Organization
 
-**Frontend Tests:**
 ```
-h2s-frontend/src/
-  components/
-    __tests__/
-      ProgressDashboard.test.jsx
-      ProgressDashboard.property.test.jsx
-      CodeEditor.test.jsx
-      CodeEditor.property.test.jsx
-      CodeReviewPanel.test.jsx
-```
-
-**Backend Tests:**
-```
-node-backend/
-  tests/
+src/
+  __tests__/
     unit/
-      progress.test.js
-      codeExecution.test.js
-      codeReview.test.js
-    property/
-      progress.property.test.js
-      codeExecution.property.test.js
-      security.property.test.js
+      components/
+        Login.test.tsx
+        Register.test.tsx
+        ChatInterface.test.tsx
+        MessageList.test.tsx
+        ProtectedRoute.test.tsx
+      contexts/
+        AuthContext.test.tsx
+        ChatContext.test.tsx
+      services/
+        api.test.ts
+        auth.test.ts
+        assistant.test.ts
+    properties/
+      auth.properties.test.ts
+      chat.properties.test.ts
+      validation.properties.test.ts
+      api.properties.test.ts
+    integration/
+      userFlows.test.tsx
 ```
 
-**AI Service Tests:**
-```
-python-ai/
-  tests/
-    test_code_review.py
-    test_code_review_properties.py
-    test_demo_mode.py
-```
+### Mocking Strategy
 
-### Integration Testing
+- **API Calls**: Mock with MSW (Mock Service Worker) for realistic HTTP mocking
+- **localStorage**: Mock with jest-localstorage-mock
+- **React Router**: Mock navigation with MemoryRouter in tests
+- **Contexts**: Provide test-specific context values for isolated component testing
 
-**End-to-End Flows:**
-1. Complete learning session: Login → Ask questions → Write code → Get review → View progress
-2. Code snippet workflow: Write code → Save snippet → Load snippet → Verify content
-3. Progress tracking: Perform activities → View dashboard → Verify metrics
-4. Demo mode operation: Disable OpenAI → Submit code → Verify rule-based review
+### Continuous Testing
 
-### Performance Testing
-
-**Load Testing:**
-- Concurrent code executions (10+ simultaneous)
-- Large code submissions (10,000+ lines)
-- High-frequency metric recording (100+ events/second)
-- Dashboard rendering with large datasets (1000+ data points)
-
-**Timeout Testing:**
-- Verify 10-second execution timeout
-- Verify 5-second API response time for code execution
-- Test timeout cleanup (no zombie processes)
-
-### Security Testing
-
-**Isolation Testing:**
-- Attempt file system access outside temp directory
-- Attempt network connections during execution
-- Attempt system command execution
-- Verify all attempts are blocked
-
-**Input Validation:**
-- SQL injection attempts in code content
-- XSS attempts in snippet names
-- Path traversal attempts in file operations
-- Oversized input handling
-
-## Implementation Notes
-
-### Technology Choices
-
-**Code Editor Library:**
-- Recommended: Monaco Editor (powers VS Code)
-- Alternative: CodeMirror 6
-- Features needed: Syntax highlighting, line numbers, keyboard shortcuts
-
-**Charting Library:**
-- Recommended: Recharts (React-friendly)
-- Alternative: Chart.js with react-chartjs-2
-- Features needed: Line charts, hover tooltips, responsive
-
-**Code Execution:**
-- Use Node.js child_process.spawn for isolation
-- Implement resource limits using OS-level controls
-- Clean up temp directories after each execution
-
-**Demo Mode AI:**
-- Python: Use ast module for parsing
-- JavaScript: Use esprima for parsing
-- Pattern matching: Regular expressions and AST traversal
-- Knowledge base: JSON file with common patterns
-
-### Deployment Considerations
-
-**Database Migrations:**
-- Create migration script for new tables
-- Ensure backward compatibility with existing data
-- Add indexes after table creation for performance
-
-**Environment Variables:**
-- `CODE_EXECUTION_TIMEOUT`: Configurable timeout (default 10000ms)
-- `MAX_MEMORY_MB`: Memory limit per execution (default 512MB)
-- `TEMP_DIR`: Directory for code execution (default ./temp)
-- `OPENAI_API_KEY`: Optional for enhanced AI (empty = demo mode)
-
-**Resource Management:**
-- Implement cleanup cron job for old temp files
-- Monitor disk space usage
-- Implement rate limiting for code execution (prevent abuse)
-
-### Future Enhancements
-
-**Potential Extensions:**
-- Collaborative coding (multiple students on same code)
-- Code comparison (diff view for before/after)
-- Achievement system (badges for milestones)
-- Leaderboards (optional, privacy-respecting)
-- Export progress reports (PDF/CSV)
-- Custom test cases for code validation
-- Video tutorials integrated with code editor
-- Peer code review system
+- Run unit tests on every file save during development
+- Run full test suite (unit + property) before commits
+- Property tests catch edge cases that manual testing might miss
+- Both test types are complementary and necessary for comprehensive coverage
